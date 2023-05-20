@@ -1,9 +1,14 @@
-from typing import Union, Annotated
-from fastapi import FastAPI, Depends, Request, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
-from pydantic import BaseModel
+import aiohttp
+import googlemaps
+import logging
+import os
+import uvicorn
+from typing import Annotated
 
-import os, logging, random, string, googlemaps, uvicorn, aiohttp
+from fastapi import FastAPI, Depends, HTTPException, status, Response
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+
+from mytypes import Place, PlaceReq, User#, UserInDB
 
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s %(levelname)s %(message)s',
@@ -14,18 +19,7 @@ GMAPKEY = os.environ.get("GMAPKEY")
 gmaps = googlemaps.Client(key=GMAPKEY)
 
 app = FastAPI()
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
-
-
-class User(BaseModel):
-    username: str
-    email: str | None = None
-    full_name: str | None = None
-    disabled: bool | None = None
-
-
-class UserInDB(User):
-    hashed_password: str
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="logintest")
 
 
 @app.get("/")
@@ -33,44 +27,23 @@ async def read_root():  # token: Annotated[str, Depends(oauth2_scheme)]):
     return {"token": "token"}
 
 
-class PlaceReq(BaseModel):
-    location: tuple[float, float] = (34.726, 135.236)
-    radius: int | None = 1000
-
-
-class Place(BaseModel):
-    name: str
-    addr: str
-    lat: float
-    lng: float
-    photo_ref: str | None
-
-
-class PlaceList():
-    to_sent: list[Place]
-
-
 @app.get("/placephoto/{photo_ref}")
-async def get_place_photo(photo_ref: str):
-    results = gmaps.places_photo(photo_ref, max_width=512)
-    with aiohttp.ClientSession() as session:
-        async with session.get("http://schoolido.lu/api/cards/788/") as resp:
-            data = await resp.json()
-            card = data["card_image"]
-            async with session.get(card) as resp2:
-                test = await resp2.read()
-                with open("cardtest2.png", "wb") as f:
-                    f.write(test)
-    print(results.read())
-    return 'results'
+async def get_place_photo(photo_ref: str) -> Response:
+    # results = gmaps.places_photo(photo_ref, max_width=512)
+    async with aiohttp.ClientSession() as session:
+        image_url = f'https://maps.googleapis.com/maps/api/place/photo?photo_reference={photo_ref}&maxheight={300}&key={GMAPKEY}'
+        async with session.get(image_url) as resp:
+            c_types = resp.headers.get('Content-Type')
+            image = await resp.read()
 
+    # print(image)
+    return Response(content=image, media_type=c_types)
 
 
 @app.post("/places")
-async def get_places(place_req: PlaceReq):
+async def get_places(place_req: PlaceReq) -> list[Place]:
     results = gmaps.places_nearby(location=place_req.location, radius=place_req.radius, type='restaurant')
-    places = PlaceList()
-    places.to_sent = []
+    places = []
     for result in results["results"]:
         # Get the name and address of the restaurant
         try:
@@ -87,67 +60,83 @@ async def get_places(place_req: PlaceReq):
 
         # Print the name and address
         print(place)
-        places.to_sent.append(place)
+        places.append(place)
     return places
 
 
 def fake_decode_token(token):
-    return User(
-        username=token + "fakedecoded", email="john@example.com", full_name="John Doe"
-    )
+    def get_user(db, username: str):
+        if username in db:
+            user_dict = db[username]
+            return user_dict #UserInDB(**user_dict)
+
+    # This doesn't provide any security at all
+    # Check the next version
+    user = get_user(fake_users_db, token)
+    return user
 
 
 async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
     user = fake_decode_token(token)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     return user
 
 
-@app.get("/users/me")
-async def read_users_me(current_user: Annotated[User, Depends(get_current_user)]):
+async def get_current_active_user(
+        current_user: Annotated[User, Depends(get_current_user)]
+):
     return current_user
 
 
-class LoginReq(BaseModel):
-    user_id: str | None
-    username: str | None
+@app.post("/logintest")
+async def logintest(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
+    return await login(form_data.username)
+    user_data = fake_users_db.get(form_data.username)
+    if not user_data:
+        # TODO create new account
+        raise HTTPException(status_code=400, detail="Incorrect username or password")
+
+    user = UserInDB(**user_data)  # ** means unpacking the dict
+    hashed_password = fake_hash_password(form_data.password)
+    if not hashed_password == user.hashed_password:
+        raise HTTPException(status_code=400, detail="Incorrect username or password")
+
+    return {"access_token": user.username, "token_type": "bearer"}
 
 
-@app.post("/login")
-async def login(login_req: LoginReq):
-    _user_id = login_req.user_id
+@app.get("/login/{user_id}")
+async def login(user_id: str | None):
+    if not user_id:
+        user_data = None
+    else:
+        user_data = fake_users_db.get(user_id)
 
-    if (not _user_id) and login_req.username:  # new user
-        _user_id = ''.join(random.choices(string.ascii_lowercase, k=16))
-        fake_users_db.update({
-            _user_id: {
-                "username": login_req.username
-            }
-        })
-        return {"access_token": _user_id, "token_type": "bearer"}
-    elif (not _user_id) and not login_req.username:
-        raise HTTPException(status_code=400, detail="Invalid request")
-    elif _user_id:
-        user_dict = fake_users_db.get(_user_id)
-        if user_dict is not None:  # user exists
-            return {"access_token": _user_id, "token_type": "bearer"}
-        else:
-            raise HTTPException(status_code=400, detail="User does not exist")
+    if not user_data:
+        # TODO create new account
+        raise HTTPException(status_code=400, detail="Incorrect username or password")
+
+    user = User(**user_data)  # ** means unpacking the dict
+    return {"access_token": user.user_id, "token_type": "bearer", "username": user.username}
+
+
+@app.get("/users/me")
+async def read_users_me(
+        current_user: Annotated[User, Depends(get_current_active_user)]
+):
+    return current_user
 
 
 fake_users_db = {
-    "johndoe": {
-        "username": "johndoe",
-        "full_name": "John Doe",
-        "email": "johndoe@example.com",
-        "token": "fakehashedsecret",
-        "disabled": False,
+    "114514": {
+        "username": "senpai",
     },
     "alice": {
         "username": "alice",
-        "full_name": "Alice Wonderson",
-        "email": "alice@example.com",
-        "token": "fakehashedsecret2",
-        "disabled": True,
     },
 }
 
