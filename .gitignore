@@ -7,3 +7,4 @@ eh-pdf.spec
 dist/
 *.exe
 __pycache__/
+*.pkl
