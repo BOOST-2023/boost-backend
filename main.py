@@ -270,6 +270,9 @@ async def go_to_next_day(
         current_user: Annotated[User, Depends(get_current_active_user)]
 ):
     current_user.update_days()
+    return {
+        'days': current_user.days
+    }
 
 
 @app.get("/users/use_coupon/{ref_id}")

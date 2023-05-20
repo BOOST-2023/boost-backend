@@ -83,6 +83,8 @@ class User(object):
         self.username = data.get('username')
         self.days = 0
         self.coupons = []
+        self.missions = []
+        self.saved_places = []
 
     def update_saved_places(self, new_places: list[Place]):  # save food places for generating coupons
         self.saved_places = new_places

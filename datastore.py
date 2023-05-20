@@ -16,6 +16,7 @@ def init_db():
 
 
 def __save_db():
+    return
     with open('users.pkl', 'wb') as outp:  # Overwrites any existing file.
         pickle.dump(USER_DB, outp, pickle.HIGHEST_PROTOCOL)
 
