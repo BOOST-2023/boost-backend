@@ -1,4 +1,6 @@
 from pydantic import BaseModel
+from typing import Annotated
+import random
 
 
 class PlaceReq(BaseModel):
@@ -67,8 +69,8 @@ class User(object):
         from datastore import update_user
 
         self.update_user = update_user
-        self.user_id = data.get('user_id')
-        self.username = data.get('username')
+        self.user_id = data.get("user_id")
+        self.username = data.get("username")
         self.days = 0
         self.coupons = []
 
@@ -82,16 +84,27 @@ class User(object):
         self.days = new_day
         self.update_user(self)
 
-    def update_coupons(self, new_coupons: list[Coupon]):
+    async def update_coupons(self, new_coupons: list[Coupon]):
         # TODO: generate random mission here
+        from main import get_random_coupon
+
+        for i in range(60):
+            coupon_ = get_random_coupon(self)
+            self.coupons.append(coupon_)
 
         # self.coupons = new_coupons
         self.update_user(self)
 
     def update_missions(self):
         # TODO: generate random mission here
+        from main import get_places
 
+        place_req = PlaceReq(self.last_location)
+        place_list = get_places(place_req)
+        place = random.choice(place_list)
+        mission
         self.update_user(self)
+
 
 # class UserInDB(User):
 #     hashed_password: str

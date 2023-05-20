@@ -83,7 +83,8 @@ async def get_place_photo(photo_ref: str) -> Response:
 @app.get("/placedetails/{ref_id}")
 async def get_placedetails(ref_id: str) -> PlaceDetails:
     results = gmaps.place(
-        place_id=ref_id, language='ja', #region="jp"
+        place_id=ref_id,
+        language="ja",  # region="jp"
     )
     result = results["result"]
     # Get the name and address of the restaurant
@@ -96,16 +97,19 @@ async def get_placedetails(ref_id: str) -> PlaceDetails:
         photo_ref=None,
         opening_time=result["opening_hours"]["weekday_text"],
         opening_now=result["opening_hours"]["open_now"],
-        phone=result.get('international_phone_number'),
-        types=result.get('types'),
-        photo_refs=[photo.get('photo_reference') for photo in result.get('photos')],
-        reviews=[Review(
-            author=rev.get('author_name'),
-            profile_photo=rev.get('profile_photo_url'),
-            published_time=rev.get('time'),
-            published_time_readable=rev.get('relative_time_description'),
-            content=rev.get('text')
-        ) for rev in result.get('reviews')],
+        phone=result.get("international_phone_number"),
+        types=result.get("types"),
+        photo_refs=[photo.get("photo_reference") for photo in result.get("photos")],
+        reviews=[
+            Review(
+                author=rev.get("author_name"),
+                profile_photo=rev.get("profile_photo_url"),
+                published_time=rev.get("time"),
+                published_time_readable=rev.get("relative_time_description"),
+                content=rev.get("text"),
+            )
+            for rev in result.get("reviews")
+        ],
     )
 
     # Print the name and address
@@ -164,7 +168,7 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
 
 
 async def get_current_active_user(
-        current_user: Annotated[User, Depends(get_current_user)]
+    current_user: Annotated[User, Depends(get_current_user)]
 ):
     return current_user
 
@@ -194,10 +198,7 @@ async def login(user_id: str | None):
             random.choices(string.ascii_letters + string.digits, k=16)
         )
         new_username = gimei.Gimei().name.hiragana
-        update_user(User(**{
-            "user_id": new_user_id,
-            "username": new_username
-        }))
+        update_user(User(**{"user_id": new_user_id, "username": new_username}))
         user_data = get_user(new_user_id)
     else:
         user_data = get_user(user_id)
@@ -215,7 +216,7 @@ async def login(user_id: str | None):
 
 @app.get("/users/me")
 async def read_users_me(
-        current_user: Annotated[User, Depends(get_current_active_user)]
+    current_user: Annotated[User, Depends(get_current_active_user)]
 ):
     return current_user
 
@@ -224,6 +225,7 @@ async def read_users_me(
 async def get_random_coupon(
     current_user: Annotated[User, Depends(get_current_active_user)]
 ):
+    place_req = PlaceReq(current_user.last_location)
     place_list = get_places(place_req=place_req)
     random_place = random.choice(place_list)
     random_constant_discount = 100  # 100円割引券
@@ -231,8 +233,6 @@ async def get_random_coupon(
         place=random_place,
         constant_discount=random_constant_discount,
     )
-
-
 
 
 fake_userid_to_lineid = {
