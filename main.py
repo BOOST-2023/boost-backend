@@ -4,16 +4,18 @@ import logging
 import os
 import uvicorn
 from typing import Annotated
+import random
 
 from fastapi import FastAPI, Depends, HTTPException, status, Response
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 
-from mytypes import Place, PlaceReq, User#, UserInDB
+from mytypes import Place, PlaceReq, User, Coupon  # , UserInDB
 
-logging.basicConfig(level=logging.INFO,
-                    format='%(asctime)s %(levelname)s %(message)s',
-                    datefmt='%Y-%m-%d %H:%M:%S'
-                    )
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
 
 GMAPKEY = os.environ.get("GMAPKEY")
 gmaps = googlemaps.Client(key=GMAPKEY)
@@ -31,9 +33,9 @@ async def read_root():  # token: Annotated[str, Depends(oauth2_scheme)]):
 async def get_place_photo(photo_ref: str) -> Response:
     # results = gmaps.places_photo(photo_ref, max_width=512)
     async with aiohttp.ClientSession() as session:
-        image_url = f'https://maps.googleapis.com/maps/api/place/photo?photo_reference={photo_ref}&maxheight={300}&key={GMAPKEY}'
+        image_url = f"https://maps.googleapis.com/maps/api/place/photo?photo_reference={photo_ref}&maxheight={300}&key={GMAPKEY}"
         async with session.get(image_url) as resp:
-            c_types = resp.headers.get('Content-Type')
+            c_types = resp.headers.get("Content-Type")
             image = await resp.read()
 
     # print(image)
@@ -42,7 +44,9 @@ async def get_place_photo(photo_ref: str) -> Response:
 
 @app.post("/places")
 async def get_places(place_req: PlaceReq) -> list[Place]:
-    results = gmaps.places_nearby(location=place_req.location, radius=place_req.radius, type='restaurant')
+    results = gmaps.places_nearby(
+        location=place_req.location, radius=place_req.radius, type="restaurant"
+    )
     places = []
     for result in results["results"]:
         # Get the name and address of the restaurant
@@ -68,7 +72,7 @@ def fake_decode_token(token):
     def get_user(db, username: str):
         if username in db:
             user_dict = db[username]
-            return user_dict #UserInDB(**user_dict)
+            return user_dict  # UserInDB(**user_dict)
 
     # This doesn't provide any security at all
     # Check the next version
@@ -88,7 +92,7 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
 
 
 async def get_current_active_user(
-        current_user: Annotated[User, Depends(get_current_user)]
+    current_user: Annotated[User, Depends(get_current_user)]
 ):
     return current_user
 
@@ -121,14 +125,28 @@ async def login(user_id: str | None):
         raise HTTPException(status_code=400, detail="Incorrect username or password")
 
     user = User(**user_data)  # ** means unpacking the dict
-    return {"access_token": user.user_id, "token_type": "bearer", "username": user.username}
+    return {
+        "access_token": user.user_id,
+        "token_type": "bearer",
+        "username": user.username,
+    }
 
 
 @app.get("/users/me")
 async def read_users_me(
-        current_user: Annotated[User, Depends(get_current_active_user)]
+    current_user: Annotated[User, Depends(get_current_active_user)]
 ):
     return current_user
+
+
+@app.get("/coupon/{user_id}")
+async def get_random_coupon(user_id: str | None, place_req: PlaceReq):
+    place_list = get_places(place_req=place_req)
+    random_place = random.choice(place_list)
+    random_constant_discount = 100  # 100円割引券
+    return Coupon(
+        user_id=user_id, place=random_place, constant_discount=random_constant_discount
+    )
 
 
 fake_users_db = {
@@ -140,5 +158,5 @@ fake_users_db = {
     },
 }
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=8000)

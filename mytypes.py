@@ -19,5 +19,12 @@ class User(BaseModel):
     username: str
 
 
+class Coupon(BaseModel):
+    user_id: str
+    place: Place
+    discount_rate: float | None
+    constant_discount: float | None
+
+
 # class UserInDB(User):
 #     hashed_password: str
