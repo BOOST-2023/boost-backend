@@ -13,9 +13,8 @@ from fastapi import FastAPI, Depends, HTTPException, status, Response
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 
-from mytypes import Place, PlaceReq, User, Coupon  # , UserInDB
+from mytypes import Place, PlaceReq, User, Coupon, PlaceDetails, Review
 from datastore import init_db, get_user, update_user
-
 
 logging.basicConfig(
     level=logging.INFO,
@@ -29,7 +28,7 @@ gmaps = googlemaps.Client(key=GMAPKEY)
 jap_name = gimei.Gimei()
 
 app = FastAPI()
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="logintest")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="loginform")
 
 origins = [
     '*'
@@ -60,6 +59,39 @@ async def get_place_photo(photo_ref: str) -> Response:
 
     # print(image)
     return Response(content=image, media_type=c_types)
+
+
+@app.get("/placedetails/{ref_id}")
+async def get_placedetails(ref_id: str) -> PlaceDetails:
+    results = gmaps.place(
+        place_id=ref_id, language='ja', #region="jp"
+    )
+    result = results["result"]
+    # Get the name and address of the restaurant
+    place = PlaceDetails(
+        ref_id=result["place_id"],
+        name=result["name"],
+        addr=result["vicinity"],
+        lat=result["geometry"]["location"]["lat"],
+        lng=result["geometry"]["location"]["lng"],
+        photo_ref=None,
+        opening_time=result["opening_hours"]["weekday_text"],
+        opening_now=result["opening_hours"]["open_now"],
+        phone=result.get('international_phone_number'),
+        types=result.get('types'),
+        photo_refs=[photo.get('photo_reference') for photo in result.get('photos')],
+        reviews=[Review(
+            author=rev.get('author_name'),
+            profile_photo=rev.get('profile_photo_url'),
+            published_time=rev.get('time'),
+            published_time_readable=rev.get('relative_time_description'),
+            content=rev.get('text')
+        ) for rev in result.get('reviews')],
+    )
+
+    # Print the name and address
+    # print(place)
+    return place
 
 
 @app.post("/places")
@@ -113,12 +145,12 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
 
 
 async def get_current_active_user(
-    current_user: Annotated[User, Depends(get_current_user)]
+        current_user: Annotated[User, Depends(get_current_user)]
 ):
     return current_user
 
 
-@app.post("/logintest")
+@app.post("/loginform")
 async def logintest(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
     # logging.debug(form_data.username)
     return await login(form_data.username)
@@ -142,9 +174,9 @@ async def login(user_id: str | None):
         new_user_id = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
         new_username = gimei.Gimei().name.hiragana
         update_user(User(**{
-                "user_id": new_user_id,
-                "username": new_username
-            }))
+            "user_id": new_user_id,
+            "username": new_username
+        }))
         user_data = get_user(new_user_id)
     else:
         user_data = get_user(user_id)
@@ -152,7 +184,7 @@ async def login(user_id: str | None):
             # Account not exist
             raise HTTPException(status_code=400, detail="Account not exist")
 
-    #user = User(**user_data)  # ** means unpacking the dict
+    # user = User(**user_data)  # ** means unpacking the dict
     return {
         "access_token": user_data.user_id,
         "token_type": "bearer",
@@ -162,7 +194,7 @@ async def login(user_id: str | None):
 
 @app.get("/users/me")
 async def read_users_me(
-    current_user: Annotated[User, Depends(get_current_active_user)]
+        current_user: Annotated[User, Depends(get_current_active_user)]
 ):
     return current_user
 

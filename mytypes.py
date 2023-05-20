@@ -15,7 +15,25 @@ class Place(BaseModel):
     photo_ref: str | None
 
 
+class Review(BaseModel):
+    author: str
+    profile_photo: str
+    published_time: int
+    published_time_readable: str
+    content: str
+
+
+class PlaceDetails(Place):
+    opening_time: list[str] | None
+    opening_now: bool | None
+    phone: str | None
+    photo_refs: list[str] | None
+    types: list[str] | None
+    reviews: list[Review] | None
+
+
 class Coupon(BaseModel):
+    ref_id: str
     title: str
     description: str  # 説明
     place: Place
@@ -31,7 +49,8 @@ class User(object):
     last_location: tuple[float, float] | None
     days: int = 0
     coupons: list[Coupon] = []
-    #update_user = None
+
+    # update_user = None
 
     def __init__(self, **data):
         super().__init__()
@@ -39,6 +58,8 @@ class User(object):
         self.update_user = update_user
         self.user_id = data.get('user_id')
         self.username = data.get('username')
+        self.days = 0
+        self.coupons = []
 
     def update_last_location(self, new_location: tuple[float, float]):
         self.last_location = new_location
@@ -53,7 +74,6 @@ class User(object):
     def update_coupons(self, new_coupons: list[Coupon]):
         self.coupons = new_coupons
         self.update_user(self)
-
 
 # class UserInDB(User):
 #     hashed_password: str
