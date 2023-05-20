@@ -31,14 +31,15 @@ class User(object):
     last_location: tuple[float, float] | None
     days: int = 0
     coupons: list[Coupon] = []
-    #update_user = None
+    # update_user = None
 
     def __init__(self, **data):
         super().__init__()
         from datastore import update_user
+
         self.update_user = update_user
-        self.user_id = data.get('user_id')
-        self.username = data.get('username')
+        self.user_id = data.get("user_id")
+        self.username = data.get("username")
 
     def update_last_location(self, new_location: tuple[float, float]):
         self.last_location = new_location
