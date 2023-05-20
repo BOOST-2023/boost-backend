@@ -43,12 +43,24 @@ class Coupon(BaseModel):
     until_days: int
 
 
+class Mission(BaseModel):
+    ref_id: str
+    title: str
+    description: str  # 説明
+    mission_type: int  # 1 for use coupon! 4 for sharing to friends
+    target_coupon_ref_id: str | None
+    from_days: int
+    until_days: int
+
+
 class User(object):
     user_id: str
     username: str
     last_location: tuple[float, float] | None
     days: int = 0
     coupons: list[Coupon] = []
+    missions: list[Mission] = []
+
     # update_user = None
 
     def __init__(self, **data):

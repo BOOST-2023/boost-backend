@@ -233,10 +233,7 @@ async def get_random_coupon(
     )
 
 
-fake_users_db = {
-    "114514": {"user_id": "114514", "username": "senpai", "missions": [], "days": 3},
-    "alice": {"user_id": "alice", "username": "alice", "missions": [], "days": 3},
-}
+
 
 fake_userid_to_lineid = {
     "114514": "U40c266919a1f957e2a3e560096ae2705",  # 福岡のline_id
@@ -263,9 +260,9 @@ fake_users_db = {
 }
 
 # 全てのユーザーについてdaysの番号のmissions
-def user_mission(fake_user_db):
+def user_mission():
     users_mission = []
-    for user in fake_user_db.values():
+    for user in fake_users_db.values():
         user_id = user["user_id"]
         days = user["days"]
         mission = user["missions"][days]
@@ -278,13 +275,13 @@ def send_mission():
     for [user_id, mission] in mission_list:
         line_id = fake_userid_to_lineid[user_id]
         line_bot_api.push_message(line_id, TextSendMessage(text=mission))
-    print(1)
+        logging.info(f'Sending mission to {line_id} {mission}')
 
 
 def send_mission_periodically(args):
     # イベント登録
     # 定期送信
-    schedule.every(10).seconds.do(send_mission)
+    schedule.every(20).seconds.do(send_mission)
 
     # イベント実行
     while True:
