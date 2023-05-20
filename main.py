@@ -81,13 +81,13 @@ async def get_current_active_user(
     return current_user
 
 
-@app.get("/")
-async def read_root():  # token: Annotated[str, Depends(oauth2_scheme)]):
-    return {"token": "token"}
-
-
 @app.get("/placephoto/{photo_ref}")
 async def get_place_photo(photo_ref: str) -> Response:
+    """
+    google map 上での写真を表示する．
+    :param photo_ref: 写真の ref 文字列，place api で得られる
+    :return: 写真ファイル
+    """
     # results = gmaps.places_photo(photo_ref, max_width=512)
     async with aiohttp.ClientSession() as session:
         image_url = f"https://maps.googleapis.com/maps/api/place/photo?photo_reference={photo_ref}&maxheight={300}&key={GMAPKEY}"
@@ -101,6 +101,11 @@ async def get_place_photo(photo_ref: str) -> Response:
 
 @app.get("/placedetails/{ref_id}")
 async def get_placedetails(ref_id: str) -> PlaceDetails:
+    """
+    詳しい場所の情報を表示する．
+    :param ref_id: 場所の唯一 ID
+    :return: 詳しい場所の情報
+    """
     results = gmaps.place(
         place_id=ref_id, language='ja',  # region="jp"
     )
@@ -137,7 +142,12 @@ async def get_places_with_type(
         current_user: Annotated[User, Depends(get_current_active_user)],
         place_req: PlaceReq, place_type: PlaceType
 ) -> list[Place]:
-
+    """
+    今のユーザーの周辺の場所を探す
+    :param place_req: 探したい場所の位置情報と半径
+    :param place_type: food か観光地か．food を探すと位置の変更をみなし，今日から今後のクーポン券とミッションがリセットして再生成される
+    :return:場所のリスト
+    """
     if place_type is PlaceType.tourist_attraction:
         result: list[Place] = []
         result += await get_places(place_req, "park")
@@ -203,12 +213,20 @@ def fake_decode_token(token):
 
 @app.post("/loginform")
 async def logintest(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
+    """
+    使わないでください
+    """
     # logging.debug(form_data.username)
     return await login(form_data.username)
 
 
 @app.get("/login/{user_id}")
 async def login(user_id: str | None):
+    """
+    新しいユーザーを作る
+    :param user_id: 0 を渡すと新しいユーザーを作られる
+    :return: ユーザーの ID と名前，ランダムに生成
+    """
     if user_id == "0":
         # TODO create new account
         new_user_id = random_string()
@@ -234,6 +252,10 @@ async def login(user_id: str | None):
 
 @app.get("/random_special_coupon")
 async def get_random_special_coupon() -> Coupon:
+    """
+    一つの少しスペシャルな娯楽施設クーポン券を表示する．5 10 15 20 25 日のチェックポイントの特典として使う
+    :return: 一つのクーポン
+    """
     random_gpt_coupon = random.choice(GPTcoupons.special_coupons)
 
     return Coupon(**{
@@ -248,6 +270,9 @@ async def get_random_special_coupon() -> Coupon:
 async def read_users_me(
         current_user: Annotated[User, Depends(get_current_active_user)]
 ):
+    """
+    今のユーザーの全ての情報を表示する
+    """
     return current_user
 
 
@@ -255,6 +280,10 @@ async def read_users_me(
 async def get_user_coupons(
         current_user: Annotated[User, Depends(get_current_active_user)]
 ) -> list[Coupon]:
+    """
+    今のユーザーの全てのクーポン券を表示する．days と使ったかどうか のプロパティが含まれているので，フロントでどう表示するか自分で決める
+    :return: クーポン券のリスト
+    """
     return current_user.coupons
 
 
@@ -262,6 +291,10 @@ async def get_user_coupons(
 async def get_user_missions(
         current_user: Annotated[User, Depends(get_current_active_user)]
 ) -> list[Mission]:
+    """
+    今のユーザーの全てのミッションを表示する．days のプロパティが含まれているので，フロントでどう表示するか自分で決める
+    :return: ミッションのリスト
+    """
     return current_user.missions
 
 
@@ -269,6 +302,9 @@ async def get_user_missions(
 async def go_to_next_day(
         current_user: Annotated[User, Depends(get_current_active_user)]
 ):
+    """
+    今のユーザーを次の日に行きます．プロントでミッションの完成が判定出来たら使いましょう
+    """
     current_user.update_days()
     return {
         'days': current_user.days
@@ -280,6 +316,11 @@ async def use_user_coupon(
         ref_id: str,
         current_user: Annotated[User, Depends(get_current_active_user)],
 ):
+    """
+    今ログインしているユーザーの指定のクーポン券を使ったことに標記する
+    :param ref_id: 使いたいクーポン券の唯一 id
+    :return: success True or False
+    """
     result = current_user.use_coupon(ref_id)
     return {
         "success": result
