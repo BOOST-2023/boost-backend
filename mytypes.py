@@ -9,8 +9,8 @@ class PlaceReq(BaseModel):
 class Place(BaseModel):
     name: str
     addr: str
-    lat: float
-    lng: float
+    lat: float  # 緯度
+    lng: float  # 経度
     photo_ref: str | None
 
 
