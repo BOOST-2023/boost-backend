@@ -196,11 +196,6 @@ async def get_random_coupon(
     )
 
 
-fake_users_db = {
-    "114514": {"user_id": "114514", "username": "senpai", "missions": [], "days": 3},
-    "alice": {"user_id": "alice", "username": "alice", "missions": [], "days": 3},
-}
-
 fake_userid_to_lineid = {
     "114514": "U40c266919a1f957e2a3e560096ae2705",  # 福岡のline_id
     "alice": "U40c266919a1f957e2a3e560096ae2705",  # 福岡のline_id
