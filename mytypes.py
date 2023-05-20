@@ -102,7 +102,6 @@ class User(object):
         place_req = PlaceReq(self.last_location)
         place_list = get_places(place_req)
         place = random.choice(place_list)
-        mission
         self.update_user(self)
 
 
