@@ -12,13 +12,11 @@ from time import sleep
 from multiprocessing import Process
 import schedule
 
-
 from fastapi import FastAPI, Depends, HTTPException, status, Response
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 
-
-from mytypes import Place, PlaceReq, User, Coupon, PlaceDetails, Review
+from mytypes import Place, PlaceReq, User, Coupon, PlaceDetails, Review, Mission, PlaceType
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
 from linebot.models import (
@@ -26,7 +24,6 @@ from linebot.models import (
     TextMessage,
     TextSendMessage,
 )
-
 
 from datastore import init_db, get_user, update_user
 
@@ -57,10 +54,24 @@ app.add_middleware(
 YOUR_CHANNEL_ACCESS_TOKEN = os.environ.get("YOUR_CHANNEL_ACCESS_TOKEN")
 YOUR_CHANNEL_SECRET = os.environ.get("YOUR_CHANNEL_SECRET")
 
-
 line_bot_api = LineBotApi(YOUR_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(YOUR_CHANNEL_SECRET)
 
+async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
+    user = fake_decode_token(token)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return user
+
+
+async def get_current_active_user(
+        current_user: Annotated[User, Depends(get_current_user)]
+):
+    return current_user
 
 @app.get("/")
 async def read_root():  # token: Annotated[str, Depends(oauth2_scheme)]):
@@ -83,7 +94,7 @@ async def get_place_photo(photo_ref: str) -> Response:
 @app.get("/placedetails/{ref_id}")
 async def get_placedetails(ref_id: str) -> PlaceDetails:
     results = gmaps.place(
-        place_id=ref_id, language='ja', #region="jp"
+        place_id=ref_id, language='ja',  # region="jp"
     )
     result = results["result"]
     # Get the name and address of the restaurant
@@ -113,10 +124,36 @@ async def get_placedetails(ref_id: str) -> PlaceDetails:
     return place
 
 
-@app.post("/places")
-async def get_places(place_req: PlaceReq) -> list[Place]:
+@app.post("/places/{place_type}")
+async def get_places_with_type(
+        current_user: Annotated[User, Depends(get_current_active_user)],
+        place_req: PlaceReq, place_type: PlaceType
+) -> list[Place]:
+    current_user.update_last_location(place_req)
+    if place_type is PlaceType.tourist_attraction:
+        result: list[Place] = []
+        result += await get_places(place_req, "park")
+        result += await get_places(place_req, "museum")
+        result += await get_places(place_req, "zoo")
+        return result
+    if place_type is PlaceType.food:
+        result: list[Place] = []
+        result += await get_places(place_req, "restaurant")
+        result += await get_places(place_req, "cafe")
+        result += await get_places(place_req, "supermarket")
+        return result
+
+
+def round_location(place_req: PlaceReq, place=2) -> PlaceReq:
+    # reduce the accuracy of location, to keep the same result when the location offsets a bit
+    (lat, lng) = (round(place_req.location[0], place), round(place_req.location[1], place))
+    return PlaceReq(**{'location': (lat, lng), 'radius': place_req.radius})
+
+
+async def get_places(place_req: PlaceReq, place_type: str) -> list[Place]:
+    place_req = round_location(place_req)
     results = gmaps.places_nearby(
-        location=place_req.location, radius=place_req.radius, type="restaurant"
+        location=place_req.location, radius=place_req.radius, type=place_type
     )
     places = []
     for result in results["results"]:
@@ -132,6 +169,7 @@ async def get_places(place_req: PlaceReq) -> list[Place]:
             lat=result["geometry"]["location"]["lat"],
             lng=result["geometry"]["location"]["lng"],
             photo_ref=photo_ref,
+            place_type=place_type
         )
 
         # Print the name and address
@@ -152,21 +190,7 @@ def fake_decode_token(token):
     return user
 
 
-async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
-    user = fake_decode_token(token)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    return user
 
-
-async def get_current_active_user(
-        current_user: Annotated[User, Depends(get_current_user)]
-):
-    return current_user
 
 
 @app.post("/loginform")
@@ -220,19 +244,29 @@ async def read_users_me(
     return current_user
 
 
-@app.get("/coupons")
-async def get_random_coupon(
-    current_user: Annotated[User, Depends(get_current_active_user)]
+@app.get("/users/coupons")
+async def get_user_coupons(
+        current_user: Annotated[User, Depends(get_current_active_user)]
+) -> list[Coupon]:
+    return current_user.coupons
+
+
+@app.get("/users/missions")
+async def get_user_missions(
+        current_user: Annotated[User, Depends(get_current_active_user)]
+) -> list[Mission]:
+    return current_user.missions
+
+
+@app.get("/users/use_coupon/{ref_id}")
+async def use_user_coupon(
+        ref_id: str,
+        current_user: Annotated[User, Depends(get_current_active_user)],
 ):
-    place_list = get_places(place_req=place_req)
-    random_place = random.choice(place_list)
-    random_constant_discount = 100  # 100円割引券
-    return Coupon(
-        place=random_place,
-        constant_discount=random_constant_discount,
-    )
-
-
+    result = current_user.use_coupon(ref_id)
+    return {
+        "success": result
+    }
 
 
 fake_userid_to_lineid = {
@@ -258,6 +292,7 @@ fake_users_db = {
     },
     "bob": {"user_id": "bob", "username": "bob", "missions": mission_list, "days": 0},
 }
+
 
 # 全てのユーザーについてdaysの番号のmissions
 def user_mission():
@@ -292,7 +327,6 @@ def send_mission_periodically(args):
 # サブプロセスを生成し、開始する
 # 毎日ミッションを全てのユーザーに送信するプロセス
 def create_send_mission_periodically_process():
-
     # プロセスIDを取得
     pid = os.getpid()
     # print("process1:" + str(pid))
@@ -309,5 +343,5 @@ def create_send_mission_periodically_process():
 
 if __name__ == "__main__":
     init_db()
-    create_send_mission_periodically_process()  # missionを定期的に送信する常駐サブプロセス
+    # create_send_mission_periodically_process()  # missionを定期的に送信する常駐サブプロセス
     uvicorn.run(app, host="127.0.0.1", port=8000)

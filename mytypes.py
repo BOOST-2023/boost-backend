@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-
+from enum import Enum
 
 class PlaceReq(BaseModel):
     location: tuple[float, float] = (34.726, 135.236)
@@ -13,6 +13,7 @@ class Place(BaseModel):
     lat: float  # 緯度
     lng: float  # 経度
     photo_ref: str | None
+    place_type: str
 
 
 class Review(BaseModel):
@@ -41,6 +42,7 @@ class Coupon(BaseModel):
     constant_discount: int | None  # ￥xx off
     from_days: int
     until_days: int
+    used: bool = False
 
 
 class Mission(BaseModel):
@@ -72,8 +74,11 @@ class User(object):
         self.days = 0
         self.coupons = []
 
-    def update_last_location(self, new_location: tuple[float, float]):
-        self.last_location = new_location
+    def update_last_location(self, new_location: PlaceReq):
+        # update both coupons and missions when location changes
+        self.last_location = new_location.location
+        self.update_coupons()
+        self.update_missions()
         self.update_user(self)
 
     def update_days(self, new_day: int | None):
@@ -82,7 +87,7 @@ class User(object):
         self.days = new_day
         self.update_user(self)
 
-    def update_coupons(self, new_coupons: list[Coupon]):
+    def update_coupons(self):
         # TODO: generate random mission here
 
         # self.coupons = new_coupons
@@ -93,5 +98,23 @@ class User(object):
 
         self.update_user(self)
 
-# class UserInDB(User):
-#     hashed_password: str
+    def use_coupon(self, ref_id: str):  # mark a coupon as used. True for success
+        # find corresponding coupon first
+        target = None
+        for c in self.coupons:
+            if c.ref_id == ref_id:
+                target = c
+                break
+
+        if target is None:
+            # not found
+            return False
+
+        target.used = True
+        self.update_user(self)
+        return True
+
+
+class PlaceType(str, Enum):
+    tourist_attraction = "tourist_attraction"
+    food = "food"
