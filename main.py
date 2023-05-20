@@ -14,6 +14,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 
 from mytypes import Place, PlaceReq, User, Coupon  # , UserInDB
+from datastore import init_db, get_user, update_user
 
 
 logging.basicConfig(
@@ -89,14 +90,14 @@ async def get_places(place_req: PlaceReq) -> list[Place]:
 
 
 def fake_decode_token(token):
-    def get_user(db, username: str):
-        if username in db:
-            user_dict = db[username]
-            return user_dict  # UserInDB(**user_dict)
+    # def get_user(db, username: str):
+    #     if username in db:
+    #         user_dict = db[username]
+    #         return user_dict  # UserInDB(**user_dict)
 
     # This doesn't provide any security at all
     # Check the next version
-    user = get_user(fake_users_db, token)
+    user = get_user(token)
     return user
 
 
@@ -140,25 +141,22 @@ async def login(user_id: str | None):
         # TODO create new account
         new_user_id = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
         new_username = gimei.Gimei().name.hiragana
-        fake_users_db.update({
-            new_user_id: {
+        update_user(User(**{
                 "user_id": new_user_id,
                 "username": new_username
-            }
-        })
-        user_data = fake_users_db.get(new_user_id)
-        user_id = new_user_id
+            }))
+        user_data = get_user(new_user_id)
     else:
-        user_data = fake_users_db.get(user_id)
+        user_data = get_user(user_id)
         if not user_data:
             # Account not exist
             raise HTTPException(status_code=400, detail="Account not exist")
 
-    user = User(**user_data)  # ** means unpacking the dict
+    #user = User(**user_data)  # ** means unpacking the dict
     return {
-        "access_token": user.user_id,
+        "access_token": user_data.user_id,
         "token_type": "bearer",
-        "username": user.username,
+        "username": user_data.username,
     }
 
 
@@ -187,10 +185,10 @@ fake_users_db = {
         "username": "senpai",
     },
     "alice": {
-        "user_id": "alice",
-        "username": "alice",
+        "user_id": "...",
     },
 }
 
 if __name__ == "__main__":
+    init_db()
     uvicorn.run(app, host="127.0.0.1", port=8000)
