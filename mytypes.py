@@ -7,6 +7,7 @@ class PlaceReq(BaseModel):
 
 
 class Place(BaseModel):
+    ref_id: str
     name: str
     addr: str
     lat: float  # 緯度
@@ -17,6 +18,14 @@ class Place(BaseModel):
 class User(BaseModel):
     user_id: str
     username: str
+
+
+class Coupon(BaseModel):
+    place: Place
+    discount_rate: float | None  # xx % off
+    constant_discount: int | None  # ￥xx off
+    description: str  # 説明
+    title: str
 
 
 # class UserInDB(User):
