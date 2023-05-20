@@ -57,6 +57,13 @@ YOUR_CHANNEL_SECRET = os.environ.get("YOUR_CHANNEL_SECRET")
 line_bot_api = LineBotApi(YOUR_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(YOUR_CHANNEL_SECRET)
 
+
+def random_string(length: int = 16):
+    return "".join(
+        random.choices(string.ascii_letters + string.digits, k=length)
+    )
+
+
 async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
     user = fake_decode_token(token)
     if not user:
@@ -72,6 +79,7 @@ async def get_current_active_user(
         current_user: Annotated[User, Depends(get_current_user)]
 ):
     return current_user
+
 
 @app.get("/")
 async def read_root():  # token: Annotated[str, Depends(oauth2_scheme)]):
@@ -190,33 +198,17 @@ def fake_decode_token(token):
     return user
 
 
-
-
-
 @app.post("/loginform")
 async def logintest(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
     # logging.debug(form_data.username)
     return await login(form_data.username)
-    user_data = fake_users_db.get(form_data.username)
-    if not user_data:
-        # TODO create new account
-        raise HTTPException(status_code=400, detail="Incorrect username or password")
-
-    user = UserInDB(**user_data)  # ** means unpacking the dict
-    hashed_password = fake_hash_password(form_data.password)
-    if not hashed_password == user.hashed_password:
-        raise HTTPException(status_code=400, detail="Incorrect username or password")
-
-    return {"access_token": user.username, "token_type": "bearer"}
 
 
 @app.get("/login/{user_id}")
 async def login(user_id: str | None):
     if user_id == "0":
         # TODO create new account
-        new_user_id = "".join(
-            random.choices(string.ascii_letters + string.digits, k=16)
-        )
+        new_user_id = random_string()
         new_username = gimei.Gimei().name.hiragana
         update_user(User(**{
             "user_id": new_user_id,
@@ -256,6 +248,13 @@ async def get_user_missions(
         current_user: Annotated[User, Depends(get_current_active_user)]
 ) -> list[Mission]:
     return current_user.missions
+
+
+@app.get("/users/next_day")
+async def go_to_next_day(
+        current_user: Annotated[User, Depends(get_current_active_user)]
+):
+    current_user.update_days()
 
 
 @app.get("/users/use_coupon/{ref_id}")

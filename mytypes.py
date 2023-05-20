@@ -1,5 +1,13 @@
 from pydantic import BaseModel
 from enum import Enum
+import random
+
+
+def random_string(length: int = 16):
+    return "".join(
+        random.choices(string.ascii_letters + string.digits, k=length)
+    )
+
 
 class PlaceReq(BaseModel):
     location: tuple[float, float] = (34.726, 135.236)
@@ -34,7 +42,7 @@ class PlaceDetails(Place):
 
 
 class Coupon(BaseModel):
-    ref_id: str
+    ref_id: str = random_string()
     title: str
     description: str  # 説明
     place: Place
@@ -46,7 +54,7 @@ class Coupon(BaseModel):
 
 
 class Mission(BaseModel):
-    ref_id: str
+    ref_id: str = random_string()
     title: str
     description: str  # 説明
     mission_type: int  # 1 for use coupon! 4 for sharing to friends
@@ -81,7 +89,7 @@ class User(object):
         self.update_missions()
         self.update_user(self)
 
-    def update_days(self, new_day: int | None):
+    def update_days(self, new_day: int | None = None):
         if new_day is None:
             new_day = self.days + 1
         self.days = new_day
@@ -113,6 +121,7 @@ class User(object):
         target.used = True
         self.update_user(self)
         return True
+
 
 
 class PlaceType(str, Enum):
