@@ -49,12 +49,12 @@ class User(object):
     last_location: tuple[float, float] | None
     days: int = 0
     coupons: list[Coupon] = []
-
     # update_user = None
 
     def __init__(self, **data):
         super().__init__()
         from datastore import update_user
+
         self.update_user = update_user
         self.user_id = data.get('user_id')
         self.username = data.get('username')
