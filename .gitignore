@@ -1,0 +1,9 @@
+*.pdf
+.idea/
+EH-Downloader/
+cookies.json
+build/
+eh-pdf.spec
+dist/
+*.exe
+__pycache__/
