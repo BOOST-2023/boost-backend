@@ -50,7 +50,6 @@ class Mission(BaseModel):
     mission_type: int  # 1 for use coupon! 4 for sharing to friends
     target_coupon_ref_id: str | None
     from_days: int
-    until_days: int
 
 
 class User(object):
@@ -84,7 +83,14 @@ class User(object):
         self.update_user(self)
 
     def update_coupons(self, new_coupons: list[Coupon]):
-        self.coupons = new_coupons
+        # TODO: generate random mission here
+
+        # self.coupons = new_coupons
+        self.update_user(self)
+
+    def update_missions(self):
+        # TODO: generate random mission here
+
         self.update_user(self)
 
 # class UserInDB(User):

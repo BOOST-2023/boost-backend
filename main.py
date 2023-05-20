@@ -275,7 +275,7 @@ def send_mission():
     for [user_id, mission] in mission_list:
         line_id = fake_userid_to_lineid[user_id]
         line_bot_api.push_message(line_id, TextSendMessage(text=mission))
-        logging.info(f'Sending mission to {line_id} {mission}')
+        # logging.info(f'Sending mission to {line_id} {mission}')
 
 
 def send_mission_periodically(args):
