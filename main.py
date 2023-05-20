@@ -7,6 +7,8 @@ from typing import Annotated
 
 from fastapi import FastAPI, Depends, HTTPException, status, Response
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.middleware.cors import CORSMiddleware
+
 
 from mytypes import Place, PlaceReq, User#, UserInDB
 
@@ -20,6 +22,18 @@ gmaps = googlemaps.Client(key=GMAPKEY)
 
 app = FastAPI()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="logintest")
+
+origins = [
+    '*'
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/")
@@ -59,7 +73,7 @@ async def get_places(place_req: PlaceReq) -> list[Place]:
         )
 
         # Print the name and address
-        print(place)
+        # print(place)
         places.append(place)
     return places
 
