@@ -3,14 +3,16 @@ import googlemaps
 import logging
 import os
 import uvicorn
+import random
+import string
+import gimei
 from typing import Annotated
 
 from fastapi import FastAPI, Depends, HTTPException, status, Response
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 
-
-from mytypes import Place, PlaceReq, User#, UserInDB
+from mytypes import Place, PlaceReq, User  # , UserInDB
 
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s %(levelname)s %(message)s',
@@ -19,6 +21,8 @@ logging.basicConfig(level=logging.INFO,
 
 GMAPKEY = os.environ.get("GMAPKEY")
 gmaps = googlemaps.Client(key=GMAPKEY)
+
+jap_name = gimei.Gimei()
 
 app = FastAPI()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="logintest")
@@ -82,7 +86,7 @@ def fake_decode_token(token):
     def get_user(db, username: str):
         if username in db:
             user_dict = db[username]
-            return user_dict #UserInDB(**user_dict)
+            return user_dict  # UserInDB(**user_dict)
 
     # This doesn't provide any security at all
     # Check the next version
@@ -109,6 +113,7 @@ async def get_current_active_user(
 
 @app.post("/logintest")
 async def logintest(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
+    # logging.debug(form_data.username)
     return await login(form_data.username)
     user_data = fake_users_db.get(form_data.username)
     if not user_data:
@@ -125,14 +130,23 @@ async def logintest(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
 
 @app.get("/login/{user_id}")
 async def login(user_id: str | None):
-    if not user_id:
-        user_data = None
+    if user_id == '0':
+        # TODO create new account
+        new_user_id = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
+        new_username = gimei.Gimei().name.hiragana
+        fake_users_db.update({
+            new_user_id: {
+                "user_id": new_user_id,
+                "username": new_username
+            }
+        })
+        user_data = fake_users_db.get(new_user_id)
+        user_id = new_user_id
     else:
         user_data = fake_users_db.get(user_id)
-
-    if not user_data:
-        # TODO create new account
-        raise HTTPException(status_code=400, detail="Incorrect username or password")
+        if not user_data:
+            # Account not exist
+            raise HTTPException(status_code=400, detail="Account not exist")
 
     user = User(**user_data)  # ** means unpacking the dict
     return {"access_token": user.user_id, "token_type": "bearer", "username": user.username}
@@ -147,9 +161,11 @@ async def read_users_me(
 
 fake_users_db = {
     "114514": {
+        "user_id": "114514",
         "username": "senpai",
     },
     "alice": {
+        "user_id": "alice",
         "username": "alice",
     },
 }
