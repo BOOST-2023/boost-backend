@@ -11,7 +11,7 @@ import random
 from time import sleep
 from multiprocessing import Process
 import schedule
-
+import GPTcoupons
 from fastapi import FastAPI, Depends, HTTPException, status, Response
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
@@ -137,18 +137,21 @@ async def get_places_with_type(
         current_user: Annotated[User, Depends(get_current_active_user)],
         place_req: PlaceReq, place_type: PlaceType
 ) -> list[Place]:
-    current_user.update_last_location(place_req)
+
     if place_type is PlaceType.tourist_attraction:
         result: list[Place] = []
         result += await get_places(place_req, "park")
         result += await get_places(place_req, "museum")
         result += await get_places(place_req, "zoo")
+
         return result
     if place_type is PlaceType.food:
         result: list[Place] = []
         result += await get_places(place_req, "restaurant")
         result += await get_places(place_req, "cafe")
         result += await get_places(place_req, "supermarket")
+        current_user.update_saved_places(result)
+        current_user.update_last_location(place_req)
         return result
 
 
@@ -228,6 +231,18 @@ async def login(user_id: str | None):
         "username": user_data.username,
     }
 
+
+@app.get("/random_special_coupon")
+async def get_random_special_coupon() -> Coupon:
+    random_gpt_coupon = random.choice(GPTcoupons.special_coupons)
+
+    return Coupon(**{
+                    'title': random_gpt_coupon['title'],
+                    'content': random_gpt_coupon['content'],
+                    'from_days': 0,
+                    'place': None,
+                    'type': 'special'
+                })
 
 @app.get("/users/me")
 async def read_users_me(
