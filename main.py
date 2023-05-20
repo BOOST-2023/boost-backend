@@ -55,6 +55,7 @@ async def get_places(place_req: PlaceReq) -> list[Place]:
         except KeyError:
             photo_ref = None
         place = Place(
+            ref_id=result["reference"],
             name=result["name"],
             addr=result["vicinity"],
             lat=result["geometry"]["location"]["lat"],
@@ -139,13 +140,15 @@ async def read_users_me(
     return current_user
 
 
-@app.get("/coupon/{user_id}")
-async def get_random_coupon(user_id: str | None, place_req: PlaceReq):
+@app.get("/coupons")
+async def get_random_coupon(current_user: Annotated[User, Depends(get_current_active_user)]):
     place_list = get_places(place_req=place_req)
     random_place = random.choice(place_list)
     random_constant_discount = 100  # 100円割引券
     return Coupon(
-        user_id=user_id, place=random_place, constant_discount=random_constant_discount
+        place=random_place,
+        constant_discount=random_constant_discount,
+
     )
 
 
