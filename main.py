@@ -8,10 +8,22 @@ import string
 import gimei
 from typing import Annotated
 import random
+from time import sleep
+from multiprocessing import Process
+import schedule
+
 
 from fastapi import FastAPI, Depends, HTTPException, status, Response
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
+
+from linebot import LineBotApi, WebhookHandler
+from linebot.exceptions import InvalidSignatureError
+from linebot.models import (
+    MessageEvent,
+    TextMessage,
+    TextSendMessage,
+)
 
 from mytypes import Place, PlaceReq, User, Coupon  # , UserInDB
 from datastore import init_db, get_user, update_user
@@ -31,9 +43,7 @@ jap_name = gimei.Gimei()
 app = FastAPI()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="logintest")
 
-origins = [
-    '*'
-]
+origins = ["*"]
 
 app.add_middleware(
     CORSMiddleware,
@@ -42,6 +52,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+YOUR_CHANNEL_ACCESS_TOKEN = os.environ.get("YOUR_CHANNEL_ACCESS_TOKEN")
+YOUR_CHANNEL_SECRET = os.environ.get("YOUR_CHANNEL_SECRET")
+
+
+line_bot_api = LineBotApi(YOUR_CHANNEL_ACCESS_TOKEN)
+handler = WebhookHandler(YOUR_CHANNEL_SECRET)
 
 
 @app.get("/")
@@ -137,14 +154,13 @@ async def logintest(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
 
 @app.get("/login/{user_id}")
 async def login(user_id: str | None):
-    if user_id == '0':
+    if user_id == "0":
         # TODO create new account
-        new_user_id = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
+        new_user_id = "".join(
+            random.choices(string.ascii_letters + string.digits, k=16)
+        )
         new_username = gimei.Gimei().name.hiragana
-        update_user(User(**{
-                "user_id": new_user_id,
-                "username": new_username
-            }))
+        update_user(User(**{"user_id": new_user_id, "username": new_username}))
         user_data = get_user(new_user_id)
     else:
         user_data = get_user(user_id)
@@ -152,7 +168,7 @@ async def login(user_id: str | None):
             # Account not exist
             raise HTTPException(status_code=400, detail="Account not exist")
 
-    #user = User(**user_data)  # ** means unpacking the dict
+    # user = User(**user_data)  # ** means unpacking the dict
     return {
         "access_token": user_data.user_id,
         "token_type": "bearer",
@@ -168,27 +184,91 @@ async def read_users_me(
 
 
 @app.get("/coupons")
-async def get_random_coupon(current_user: Annotated[User, Depends(get_current_active_user)]):
+async def get_random_coupon(
+    current_user: Annotated[User, Depends(get_current_active_user)]
+):
     place_list = get_places(place_req=place_req)
     random_place = random.choice(place_list)
     random_constant_discount = 100  # 100円割引券
     return Coupon(
         place=random_place,
         constant_discount=random_constant_discount,
-
     )
 
+
+fake_userid_to_lineid = {
+    "114514": "U40c266919a1f957e2a3e560096ae2705",  # 福岡のline_id
+    "alice": "U40c266919a1f957e2a3e560096ae2705",  # 福岡のline_id
+    "bob": "U40c266919a1f957e2a3e560096ae2705",  # 福岡のline_id
+}
+
+mission_list = ["a", "b", "c", "d", "e"]
 
 fake_users_db = {
     "114514": {
         "user_id": "114514",
         "username": "senpai",
+        "missions": mission_list,
+        "days": 3,
     },
     "alice": {
-        "user_id": "...",
+        "user_id": "alice",
+        "username": "alice",
+        "missions": mission_list,
+        "days": 1,
     },
+    "bob": {"user_id": "bob", "username": "bob", "missions": mission_list, "days": 0},
 }
+
+# 全てのユーザーについてdaysの番号のmissions
+def user_mission(fake_user_db):
+    users_mission = []
+    for user in fake_user_db.values():
+        user_id = user["user_id"]
+        days = user["days"]
+        mission = user["missions"][days]
+        users_mission.append((user_id, mission))
+    return users_mission
+
+
+def send_mission():
+    mission_list = user_mission()
+    for [user_id, mission] in mission_list:
+        line_id = fake_userid_to_lineid[user_id]
+        line_bot_api.push_message(line_id, TextSendMessage(text=mission))
+    print(1)
+
+
+def send_mission_periodically(args):
+    # イベント登録
+    # 定期送信
+    schedule.every(10).seconds.do(send_mission)
+
+    # イベント実行
+    while True:
+        schedule.run_pending()
+        sleep(1)
+
+
+# サブプロセスを生成し、開始する
+# 毎日ミッションを全てのユーザーに送信するプロセス
+def create_send_mission_periodically_process():
+
+    # プロセスIDを取得
+    pid = os.getpid()
+    # print("process1:" + str(pid))
+
+    # サブプロセスを生成する
+    p = Process(
+        target=send_mission_periodically,
+        args=("Message: call execute_anothoer_process()!",),
+    )
+
+    # サブプロセスを開始する
+    p.start()
+
 
 if __name__ == "__main__":
     init_db()
+    create_send_mission_periodically_process()  # missionを定期的に送信する常駐サブプロセス
     uvicorn.run(app, host="127.0.0.1", port=8000)
