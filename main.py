@@ -390,6 +390,7 @@ def user_mission():
 
 def send_mission():
     logging.info('send_mission started')
+    line_bot_api.broadcast(TextSendMessage(text="今日のMissionです!"))
     missions = user_mission()
     for [line_id, mission] in missions:
         if line_id is not None:
@@ -400,7 +401,8 @@ def send_mission():
 def send_mission_periodically(args):
     # イベント登録
     # 定期送信
-    schedule.every(20).seconds.do(send_mission)
+    schedule.every(20).seconds.do(send_mission) # デモ用
+    # schedule.every(1).days.do(send_mission) # 毎日実行
 
     # イベント実行
     while True:
