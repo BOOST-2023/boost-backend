@@ -311,6 +311,20 @@ async def go_to_next_day(
     }
 
 
+@app.get("/users/linelink/{line_id}")
+async def connect_line_account(
+        line_id: str,
+        current_user: Annotated[User, Depends(get_current_active_user)]
+):
+    """
+    今のユーザーを指定された LINE ID に紐をつける
+    """
+    current_user.update_line_id(line_id)
+    return {
+        'line_id': current_user.line_id
+    }
+
+
 @app.get("/users/use_coupon/{ref_id}")
 async def use_user_coupon(
         ref_id: str,

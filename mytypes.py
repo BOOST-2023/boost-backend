@@ -71,6 +71,7 @@ class User(object):
     coupons: list[Coupon] = []
     missions: list[Mission] = []
     saved_places: list[Place] = []
+    line_id: str | None
 
     # update_user = None
 
@@ -102,6 +103,10 @@ class User(object):
             new_day = self.days + 1
         self.days = new_day
         self.update_missions()
+        self.update_user(self)
+
+    def update_line_id(self, line_id: str | None = None):
+        self.line_id = line_id
         self.update_user(self)
 
     def update_coupons(self):
