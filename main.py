@@ -61,9 +61,9 @@ line_bot_api = LineBotApi(YOUR_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(YOUR_CHANNEL_SECRET)
 
 
-def random_string(length: int = 16):
+def random_string(length: int = 8):
     return "".join(
-        random.choices(string.ascii_letters + string.digits, k=length)
+        random.choices(string.digits, k=length)
     )
 
 
@@ -120,6 +120,7 @@ async def get_placedetails(ref_id: str) -> PlaceDetails:
         addr=result["vicinity"],
         lat=result["geometry"]["location"]["lat"],
         lng=result["geometry"]["location"]["lng"],
+        place_type="",
         photo_ref=None,
         opening_time=result["opening_hours"]["weekday_text"],
         opening_now=result["opening_hours"]["open_now"],
