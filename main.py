@@ -1,3 +1,5 @@
+import pickle
+
 import aiohttp
 import googlemaps
 import logging
@@ -141,7 +143,8 @@ async def get_placedetails(ref_id: str) -> PlaceDetails:
 @app.post("/places/{place_type}")
 async def get_places_with_type(
         current_user: Annotated[User, Depends(get_current_active_user)],
-        place_req: PlaceReq, place_type: PlaceType
+        place_req: PlaceReq,
+        place_type: PlaceType
 ) -> list[Place]:
     """
     今のユーザーの周辺の場所を探す
@@ -370,23 +373,28 @@ fake_users_db = {
 # 全てのユーザーについてdaysの番号のmissions
 def user_mission():
     users_mission = []
-    all_user_id_list = get_user_id_all()
-    for user_id in all_user_id_list:
-        user = get_user(user_id)
+    with open('users.pkl', 'rb') as inp:
+        USER_DB = pickle.load(inp)
+    for user_id in USER_DB:
+        user = USER_DB[user_id]
         days = user.days
         for mission in user.missions:
             if mission.from_days == days:
-                users_mission.append((user_id, mission))
+                try:
+                    users_mission.append((user.line_id, mission))
+                except AttributeError:
+                    users_mission.append((None, mission))
 
     return users_mission
 
 
 def send_mission():
+    logging.info('send_mission started')
     missions = user_mission()
-    for [user_id, mission] in missions:
-        line_id = get_user(user_id).line_id
-        line_bot_api.push_message(line_id, TextSendMessage(text=f'{mission.title}\n{mission.content}'))
-        # logging.info(f'Sending mission to {line_id} {mission}')
+    for [line_id, mission] in missions:
+        if line_id is not None:
+            line_bot_api.push_message(line_id, TextSendMessage(text=f'{mission.title}\n{mission.content}'))
+            logging.info(f'Sending mission to {line_id} {mission}')
 
 
 def send_mission_periodically(args):
@@ -419,5 +427,5 @@ def create_send_mission_periodically_process():
 
 if __name__ == "__main__":
     init_db()
-    # create_send_mission_periodically_process()  # missionを定期的に送信する常駐サブプロセス
+    create_send_mission_periodically_process()  # missionを定期的に送信する常駐サブプロセス
     uvicorn.run(app, host="127.0.0.1", port=8000)

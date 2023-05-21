@@ -86,6 +86,7 @@ class User(object):
         self.coupons = []
         self.missions = []
         self.saved_places = []
+        self.line_id = None
 
     def update_saved_places(self, new_places: list[Place]):  # save food places for generating coupons
         self.saved_places = new_places
