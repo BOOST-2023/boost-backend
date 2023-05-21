@@ -25,7 +25,8 @@ from linebot.models import (
     TextSendMessage,
 )
 
-from datastore import init_db, get_user, update_user
+
+from datastore import init_db, get_user, update_user, get_user_id_all
 
 logging.basicConfig(
     level=logging.INFO,
@@ -369,19 +370,22 @@ fake_users_db = {
 # 全てのユーザーについてdaysの番号のmissions
 def user_mission():
     users_mission = []
-    for user in fake_users_db.values():
-        user_id = user["user_id"]
-        days = user["days"]
-        mission = user["missions"][days]
-        users_mission.append((user_id, mission))
+    all_user_id_list = get_user_id_all()
+    for user_id in all_user_id_list:
+        user = get_user(user_id)
+        days = user.days
+        for mission in user.missions:
+            if mission.from_days == days:
+                users_mission.append((user_id, mission))
+
     return users_mission
 
 
 def send_mission():
-    mission_list = user_mission()
-    for [user_id, mission] in mission_list:
-        line_id = fake_userid_to_lineid[user_id]
-        line_bot_api.push_message(line_id, TextSendMessage(text=mission))
+    missions = user_mission()
+    for [user_id, mission] in missions:
+        line_id = get_user(user_id).line_id
+        line_bot_api.push_message(line_id, TextSendMessage(text=f'{mission.title}\n{mission.content}'))
         # logging.info(f'Sending mission to {line_id} {mission}')
 
 

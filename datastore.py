@@ -16,13 +16,17 @@ def init_db():
 
 
 def __save_db():
-    #return
+    # return
     with open('users.pkl', 'wb') as outp:  # Overwrites any existing file.
         pickle.dump(USER_DB, outp, pickle.HIGHEST_PROTOCOL)
 
 
 def get_user(user_id: str) -> User:
     return USER_DB.get(user_id)
+
+
+def get_user_id_all() -> list[str]:
+    return list(USER_DB.keys())
 
 
 def update_user(new_user: User):
@@ -32,5 +36,3 @@ def update_user(new_user: User):
         new_user.user_id: new_user
     })
     __save_db()
-
-
